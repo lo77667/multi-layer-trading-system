@@ -1,0 +1,42 @@
+{
+  "mode": "paper",
+  "symbols": [
+    "EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "AUD_USD", "USD_CAD", "NZD_USD",
+    "EUR_GBP", "EUR_JPY", "EUR_CHF", "EUR_AUD", "EUR_CAD", "EUR_NZD",
+    "GBP_JPY", "GBP_CHF", "GBP_AUD", "GBP_CAD", "GBP_NZD",
+    "AUD_JPY", "AUD_NZD", "AUD_CAD", "AUD_CHF",
+    "CAD_JPY", "CAD_CHF", "CHF_JPY", "NZD_JPY", "NZD_CAD", "NZD_CHF"
+  ],
+  "scanner": {
+    "top_n": 10,
+    "min_history": 120,
+    "lookahead_bars": 8
+  },
+  "context": {
+    "economic_event_blackout_minutes": 120,
+    "sentiment_extreme_threshold": 0.75,
+    "volume_average_window": 20,
+    "correlation_window": 50
+  },
+  "risk": {
+    "daily_loss_limit_pct": 0.02,
+    "risk_per_trade_pct": 0.01,
+    "minimum_reward_risk": 3.0,
+    "atr_period": 14,
+    "stop_atr_multiple": 1.5,
+    "trailing_activation_profit_pct": 0.01,
+    "max_open_positions": 3,
+    "max_notional_pct_of_equity": 25.0
+  },
+  "execution": {
+    "slices": 3,
+    "slice_interval_seconds": 60,
+    "max_slippage_pips": 1.5
+  },
+  "readiness": {
+    "required_paper_days": 90,
+    "required_trades": 60,
+    "minimum_win_rate": 0.55,
+    "require_consecutive_wins": true
+  }
+}

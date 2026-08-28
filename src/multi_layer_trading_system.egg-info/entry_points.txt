@@ -1,0 +1,2 @@
+[console_scripts]
+mlts = trading_system.cli:main

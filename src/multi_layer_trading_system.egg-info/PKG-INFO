@@ -1,0 +1,72 @@
+Metadata-Version: 2.4
+Name: multi-layer-trading-system
+Version: 0.1.0
+Summary: Local-first multi-layer trading research and paper-trading system
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: pandas>=2.1
+Provides-Extra: ml
+Requires-Dist: scikit-learn>=1.4; extra == "ml"
+Requires-Dist: xgboost>=2.0; extra == "ml"
+Requires-Dist: torch>=2.2; extra == "ml"
+Requires-Dist: transformers>=4.40; extra == "ml"
+Provides-Extra: broker
+Requires-Dist: requests>=2.31; extra == "broker"
+Requires-Dist: MetaTrader5>=5.0; platform_system == "Windows" and extra == "broker"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+
+# نظام التداول متعدد الطبقات
+
+نظام بحث وتداول ورقي محلي مبني حول مبدأ **حماية رأس المال قبل تعظيم العائد**. يطبق خط أنابيب من ست طبقات: المسح الأولي، التحليل العميق، تعديل السياق، محرك الشك، محرك المخاطر، ثم التنفيذ الورقي المجزأ.
+
+> **الوضع الافتراضي آمن:** لا ينفذ المشروع أوامر حقيقية. موصلات الوسطاء الحقيقية غير مفعلة، ويحتوي مسار التنفيذ على قفل صريح يرفض أي تشغيل حي ما لم يُبنَ تكامل مستقل ويُفعَّل خارج الإعدادات الافتراضية بعد مراجعة بشرية.
+
+## ما تم تنفيذه
+
+| الطبقة | الوظيفة الحالية |
+|---|---|
+| 0 — Scanner | مسح 28 زوجاً، استخراج خصائص سعرية، وترتيب أفضل 5–10 فرص. يوجد نموذج خفيف اختياري، مع بديل حتمي يعمل دون XGBoost. |
+| 1 — Deep Analyst | دمج إشارات الاتجاه والزخم والأنماط الزمنية. الواجهات مصممة لاستبدال البدائل الحتمية بنماذج LSTM وTransformer عند توافرها. |
+| 2 — Context Modulator | حظر التداول قرب الأحداث الاقتصادية، تعديل الحجم عند المشاعر المتطرفة، واختيار استراتيجية الاتجاه أو الارتداد بحسب نظام السوق. |
+| 3 — Uncertainty Engine | تطبيق قاعدة 3-2-1، وفحص الحجم، الصفقات الكبيرة، واتجاه الأصول المرتبطة قبل إصدار قرار نهائي. |
+| 4 — Risk Engine | حد خسارة يومي 2%، مخاطرة صفقة 1%، نسبة عائد/مخاطرة دنيا 1:3، وقف 1.5×ATR، وTrailing Stop بعد ربح 1%. |
+| 5 — Execution Master | محاكاة Limit Orders وتقسيم الصفقة إلى 3–4 شرائح مع سجل أوامر قابل للمراجعة. |
+
+## القيود المقصودة
+
+المشروع مخصص للبحث والاختبار الورقي، وليس توصية استثمارية أو ضماناً للربحية. لا توجد أسرار أو مفاتيح API داخل المستودع. ملفات البيئة المحلية مستثناة من Git، وتوجد إعدادات نموذجية فقط.
+
+يتطلب شرط الإطلاق الذي حدده صاحب المشروع **60 صفقة ناجحة متتالية** بنسبة نجاح لا تقل عن 55%، إضافة إلى تشغيل ورقي مستمر لمدة ثلاثة أشهر. تم تمثيل الشرط في بوابة الجاهزية، لكنه لا يثبت صلاحية استراتيجية حقيقية ولا يفتح التداول الحي تلقائياً.
+
+## التشغيل السريع
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+pytest -q
+python -m trading_system.cli generate-sample --output data/sample/eurusd.csv
+python -m trading_system.cli backtest --csv data/sample/eurusd.csv --symbol EUR_USD
+python -m trading_system.cli preflight
+```
+
+للمسح على بيانات CSV متعددة، استخدم مجلد `data/market/` وضع ملفاً لكل زوج، ثم شغّل:
+
+```bash
+python -m trading_system.cli scan --data-dir data/market --top 10
+```
+
+## شكل البيانات
+
+يقبل النظام ملف CSV يحتوي على الأعمدة التالية: `timestamp, open, high, low, close, volume`. يمكن أن تكون `timestamp` بصيغة ISO-8601، وتُرتب السجلات زمنياً قبل التحليل. موصل OANDA وMT5 موجودان كواجهات آمنة قابلة للتوسعة؛ لا يُستدعى أي منهما تلقائياً.
+
+## خطة التطوير التالية
+
+تبدأ المرحلة العملية بموصل بيانات تاريخية، ثم تدريب وفحص زمني دون تسرب للمستقبل، ثم تشغيل ورقي لمدة ثلاثة أشهر مع تقارير يومية، ومراجعة الانزلاق والعمولات وحالات انقطاع البيانات. لا يُسمح بإضافة موصل حي قبل وجود اختبارات تكامل، مفاتيح منفصلة، حد أقصى للأوامر، وموافقة بشرية صريحة.
+
+## الترخيص
+
+يُترك الترخيص لمالك المستودع. هذا المشروع لا يقدم نصيحة مالية، وأي استخدام بأموال حقيقية يقع تحت مسؤولية المشغّل وحده.
