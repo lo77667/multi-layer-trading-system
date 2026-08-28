@@ -1,0 +1,10 @@
+{
+  "entry": "main.typ",
+  "metadata": {
+    "author": "Manus AI",
+    "subtitle": "Generated from local paper-trading research",
+    "title": "Advanced Backtest Report"
+  },
+  "mode": "report",
+  "theme": "report-theme.typ"
+}

@@ -14,11 +14,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+report = [
+  "matplotlib>=3.8",
+]
 ml = [
   "scikit-learn>=1.4",
   "xgboost>=2.0",
   "torch>=2.2",
   "transformers>=4.40",
+  "matplotlib>=3.8",
 ]
 broker = [
   "requests>=2.31",

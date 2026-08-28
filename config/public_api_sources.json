@@ -1,0 +1,33 @@
+{
+  "catalog_origin": "https://github.com/public-apis/public-apis",
+  "catalog_branch": "master",
+  "sources": [
+    {
+      "name": "Twelve Data",
+      "category": "Finance",
+      "url": "https://twelvedata.com/",
+      "documentation": "https://twelvedata.com/docs",
+      "auth": "apiKey",
+      "project_role": "intraday OHLCV for EUR/USD and GBP/JPY",
+      "adapter": "trading_system.public_api_sources.TwelveDataClient"
+    },
+    {
+      "name": "Frankfurter",
+      "category": "Currency Exchange",
+      "url": "https://frankfurter.dev/",
+      "documentation": "https://frankfurter.dev/v1/",
+      "auth": "none",
+      "project_role": "daily reference exchange rates and sanity-check benchmark",
+      "adapter": "trading_system.public_api_sources.FrankfurterClient"
+    },
+    {
+      "name": "GNews",
+      "category": "News",
+      "url": "https://gnews.io/",
+      "documentation": "https://docs.gnews.io/endpoints/search-endpoint",
+      "auth": "apiKey",
+      "project_role": "news context feed for downstream FinBERT sentiment scoring",
+      "adapter": "trading_system.public_api_sources.GNewsClient"
+    }
+  ]
+}

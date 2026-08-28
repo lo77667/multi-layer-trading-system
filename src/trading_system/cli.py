@@ -5,16 +5,20 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .advanced_backtest import AdvancedBacktester, StressWindow, TradingCostModel
 from .analyst import DeepAnalyst
 from .backtest import ConservativeBacktester
 from .context import ContextModulator
 from .data import generate_sample_candles, snapshot_from_csv, write_candles_csv
 from .execution import PaperExecutor
 from .pipeline import TradingPipeline
+from .public_api_sources import TwelveDataClient
+from .modeling import XGBoostScannerTrainer
+from .reporting import write_typst_report
 from .readiness import evaluate_readiness
 from .risk import RiskEngine
 from .scanner import InitialScanner
-from .types import MarketSnapshot, TradeResult
+from .types import MarketSnapshot
 from .uncertainty import UncertaintyEngine
 
 
@@ -57,6 +61,38 @@ def cmd_generate_sample(args: argparse.Namespace) -> None:
     print(f"Wrote {args.rows} candles to {args.output}")
 
 
+def cmd_train_scanner(args: argparse.Namespace) -> None:
+    candles = snapshot_from_csv(args.symbol, args.csv).candles
+    output = Path(args.output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    trainer = XGBoostScannerTrainer(horizon=args.horizon, label_threshold=args.label_threshold)
+    result = trainer.fit(candles, test_fraction=args.test_fraction)
+    model_path = output / "xgboost_scanner.json"
+    result.model.save_model(str(model_path))
+    importance_path = trainer.plot_top_features(output / "top10_features.png", top_n=10)
+    (output / "training_metadata.json").write_text(json.dumps({
+        "symbol": args.symbol,
+        "best_params": result.best_params,
+        "validation_size": result.validation_size,
+        "feature_importance": result.feature_importance.to_dict(),
+    }, indent=2), encoding="utf-8")
+    print(json.dumps({"model": str(model_path), "feature_importance_plot": str(importance_path), "best_params": result.best_params}, indent=2))
+
+
+def cmd_download_twelve(args: argparse.Namespace) -> None:
+    output = Path(args.output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    client = TwelveDataClient()
+    for symbol in args.symbols:
+        if args.start_date and args.end_date:
+            candles = client.download_range(symbol, args.start_date, args.end_date, args.interval, args.chunk_days, args.sleep_seconds)
+        else:
+            candles = client.time_series(symbol, args.interval, args.outputsize)
+        filename = symbol.replace("/", "_").upper() + ".csv"
+        write_candles_csv(candles, output / filename)
+        print(f"Downloaded {len(candles)} candles for {symbol} to {output / filename}")
+
+
 def cmd_backtest(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     report = ConservativeBacktester(build_pipeline(config).risk).run(args.symbol, snapshot_from_csv(args.symbol, args.csv).candles, args.equity)
@@ -67,6 +103,38 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         "trades": len(report.trades),
         "win_rate": report.win_rate,
     }, indent=2))
+
+
+def _stress_windows(values: list[str]) -> tuple[StressWindow, ...]:
+    windows: list[StressWindow] = []
+    for value in values:
+        name, start, end, multiplier = value.split(",", maxsplit=3)
+        windows.append(StressWindow(name, datetime.fromisoformat(start), datetime.fromisoformat(end), float(multiplier)))
+    return tuple(windows)
+
+
+def _advanced_report(args: argparse.Namespace):
+    config = load_config(args.config)
+    risk = build_pipeline(config).risk
+    costs = TradingCostModel(
+        commission_per_unit=args.commission_per_unit,
+        base_slippage_pips=args.base_slippage_pips,
+        news_slippage_multiplier=args.news_slippage_multiplier,
+        stressed_windows=_stress_windows(args.stress_window),
+    )
+    candles = snapshot_from_csv(args.symbol, args.csv).candles
+    return AdvancedBacktester(risk=risk, costs=costs).run_sma(args.symbol, candles, args.equity)
+
+
+def cmd_advanced_backtest(args: argparse.Namespace) -> None:
+    report = _advanced_report(args)
+    print(json.dumps(report.metrics(), indent=2))
+
+
+def cmd_report(args: argparse.Namespace) -> None:
+    report = _advanced_report(args)
+    pdf = write_typst_report(report, args.output_dir, args.symbol, args.data_source)
+    print(json.dumps({"pdf": str(pdf), **report.metrics()}, indent=2))
 
 
 def cmd_scan(args: argparse.Namespace) -> None:
@@ -102,7 +170,7 @@ def cmd_preflight(args: argparse.Namespace) -> None:
     readiness = config["readiness"]
     report = evaluate_readiness(
         trades=[],
-        paper_started_at=datetime.now(timezone.utc) - timedelta(days=0),
+        paper_started_at=datetime.now(timezone.utc),
         required_paper_days=readiness["required_paper_days"],
         required_trades=readiness["required_trades"],
         minimum_win_rate=readiness["minimum_win_rate"],
@@ -112,6 +180,15 @@ def cmd_preflight(args: argparse.Namespace) -> None:
     print("LIVE EXECUTION: DISABLED")
 
 
+def _add_cost_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--equity", type=float, default=10_000)
+    parser.add_argument("--commission-per-unit", type=float, default=0.00001)
+    parser.add_argument("--base-slippage-pips", type=float, default=0.2)
+    parser.add_argument("--news-slippage-multiplier", type=float, default=3.0)
+    parser.add_argument("--stress-window", action="append", default=[], help="name,start_iso,end_iso,slippage_multiplier")
+    parser.add_argument("--config", default="config/default.json")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local-first multi-layer trading system")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -119,12 +196,42 @@ def build_parser() -> argparse.ArgumentParser:
     sample.add_argument("--output", required=True)
     sample.add_argument("--rows", type=int, default=500)
     sample.set_defaults(func=cmd_generate_sample)
+    train = sub.add_parser("train-scanner")
+    train.add_argument("--csv", required=True)
+    train.add_argument("--symbol", required=True)
+    train.add_argument("--output-dir", default="models/scanner")
+    train.add_argument("--horizon", type=int, default=8)
+    train.add_argument("--label-threshold", type=float, default=0.0005)
+    train.add_argument("--test-fraction", type=float, default=0.2)
+    train.set_defaults(func=cmd_train_scanner)
+    download = sub.add_parser("download-twelve")
+    download.add_argument("--symbols", nargs="+", default=["EUR/USD", "GBP/JPY"])
+    download.add_argument("--interval", default="5min")
+    download.add_argument("--outputsize", type=int, default=5000)
+    download.add_argument("--start-date")
+    download.add_argument("--end-date")
+    download.add_argument("--chunk-days", type=int, default=14)
+    download.add_argument("--sleep-seconds", type=float, default=1.0)
+    download.add_argument("--output-dir", default="data/market")
+    download.set_defaults(func=cmd_download_twelve)
     backtest = sub.add_parser("backtest")
     backtest.add_argument("--csv", required=True)
     backtest.add_argument("--symbol", required=True)
     backtest.add_argument("--equity", type=float, default=10_000)
     backtest.add_argument("--config", default="config/default.json")
     backtest.set_defaults(func=cmd_backtest)
+    advanced = sub.add_parser("advanced-backtest")
+    advanced.add_argument("--csv", required=True)
+    advanced.add_argument("--symbol", required=True)
+    _add_cost_args(advanced)
+    advanced.set_defaults(func=cmd_advanced_backtest)
+    report = sub.add_parser("report")
+    report.add_argument("--csv", required=True)
+    report.add_argument("--symbol", required=True)
+    report.add_argument("--output-dir", default="reports/backtest_run")
+    report.add_argument("--data-source", default="Twelve Data CSV")
+    _add_cost_args(report)
+    report.set_defaults(func=cmd_report)
     scan = sub.add_parser("scan")
     scan.add_argument("--data-dir", required=True)
     scan.add_argument("--top", type=int)

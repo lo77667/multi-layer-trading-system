@@ -50,3 +50,39 @@ python -m trading_system.cli scan --data-dir data/market --top 10
 ## الترخيص
 
 يُترك الترخيص لمالك المستودع. هذا المشروع لا يقدم نصيحة مالية، وأي استخدام بأموال حقيقية يقع تحت مسؤولية المشغّل وحده.
+
+## الترقية الكمية والبيانات الخارجية
+
+أضيفت هندسة خصائص سببية في `trading_system.features` تشمل RSI بفترات 7 و14 و21، MACD Histogram، عرض Bollinger، عرض Keltner، ATR، وVolume Ratio. يطبق `XGBoostScannerTrainer` تقسيم `TimeSeriesSplit` و`GridSearchCV` على `max_depth` و`learning_rate` و`n_estimators`، مع `scale_pos_weight` و`early_stopping_rounds=20`. لا تدخل الشمعة المستقبلية في الخصائص؛ المستقبل يستخدم فقط لبناء الوسم.
+
+المصادر المختارة من كتالوج `public-apis` موثقة في `config/public_api_sources.json` و`docs/source-availability.md`. لتنزيل شموع حقيقية، ضع مفتاح Twelve Data في البيئة ثم نفّذ:
+
+```bash
+export TWELVE_DATA_API_KEY='ضع-المفتاح-محلياً-فقط'
+pip install -e '.[broker,ml,report]'
+python -m trading_system.cli download-twelve \
+  --symbols EUR/USD GBP/JPY \
+  --interval 5min \
+  --start-date 2024-01-01T00:00:00+00:00 \
+  --end-date 2026-01-01T00:00:00+00:00 \
+  --chunk-days 14 \
+  --sleep-seconds 1.0 \
+  --output-dir data/market
+```
+
+قد تحتاج بيانات العامين إلى تنزيل دفعات متتابعة أو خطة API تسمح بالحجم المطلوب. لا يعتبر Frankfurter بديلاً عن بيانات M1/M5؛ دوره مرجعي يومي فقط. بعد توفير ملف CSV حقيقي، يمكن تشغيل الاختبار المتقدم:
+
+```bash
+python -m trading_system.cli advanced-backtest \
+  --csv data/market/EUR_USD.csv \
+  --symbol EUR_USD \
+  --stress-window 'event,2024-01-01T12:00:00+00:00,2024-01-01T14:00:00+00:00,4'
+
+python -m trading_system.cli report \
+  --csv data/market/EUR_USD.csv \
+  --symbol EUR_USD \
+  --output-dir reports/eurusd_run \
+  --data-source 'Twelve Data 5min CSV'
+```
+
+ينتج أمر `train-scanner` ملف نموذج JSON، وملف metadata، ومخطط أهم عشر خصائص. وينتج أمر `report` تقرير PDF، ومنحنى رأس المال، وملف JSON بالمقاييس. أي نتيجة على البيانات الاصطناعية أو على عينة قصيرة تبقى اختباراً برمجياً وليست دليلاً على صلاحية استراتيجية حقيقية.

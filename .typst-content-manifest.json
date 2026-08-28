@@ -1,0 +1,13 @@
+{
+  "task_kind": "new-document",
+  "output": "pdf",
+  "signals": [],
+  "hard_constraints": ["Arabic-capable report", "equity curve", "trade distribution", "risk metrics"],
+  "content_features": {
+    "code_blocks": 0,
+    "defined_terms": 8,
+    "portrait_images": 0,
+    "charts": 1,
+    "tables": 3
+  }
+}
