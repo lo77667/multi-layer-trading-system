@@ -12,4 +12,5 @@ data/processed/
 logs/
 models/
 *.sqlite3
+*.egg-info/
 .DS_Store
