@@ -28,6 +28,33 @@
       "auth": "apiKey",
       "project_role": "news context feed for downstream FinBERT sentiment scoring",
       "adapter": "trading_system.public_api_sources.GNewsClient"
+    },
+    {
+      "name": "Alpha Vantage",
+      "category": "Finance",
+      "url": "https://www.alphavantage.co/",
+      "documentation": "https://www.alphavantage.co/documentation/",
+      "auth": "apiKey",
+      "project_role": "intraday FX (1min/5min/15min/30min/60min) OHLC historical data as a free-tier alternative (subject to documented rate limits)",
+      "adapter": "trading_system.public_api_sources.AlphaVantageClient"
+    },
+    {
+      "name": "FRED",
+      "category": "Economic Data",
+      "url": "https://fred.stlouisfed.org/",
+      "documentation": "https://fred.stlouisfed.org/docs/api/fred/",
+      "auth": "apiKey",
+      "project_role": "macroeconomic time series (CPI, GDP, rates) for feature enrichment and macro signals",
+      "adapter": "trading_system.public_api_sources.FredClient"
+    },
+    {
+      "name": "NewsAPI",
+      "category": "News",
+      "url": "https://newsapi.org/",
+      "documentation": "https://newsapi.org/docs",
+      "auth": "apiKey",
+      "project_role": "headline/article feed for sentiment context (free Developer tier available with documented daily request limits)",
+      "adapter": "trading_system.public_api_sources.NewsApiClient"
     }
   ]
 }
